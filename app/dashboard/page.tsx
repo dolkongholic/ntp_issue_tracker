@@ -25,13 +25,22 @@ import {
 import { ProjectDialog } from "@/components/project-dialog";
 import { api } from "@/lib/api";
 import { useAppData } from "@/lib/app-data";
+import { useNickname } from "@/lib/use-nickname";
 import { relativeTime } from "@/lib/format";
 import type { Project } from "@/lib/types";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { projects, projectsLoading, projectsError, upsertProject, removeProject } =
-    useAppData();
+  const { nickname } = useNickname();
+  const {
+    projects,
+    filteredProjects,
+    projectsLoading,
+    projectsError,
+    upsertProject,
+    removeProject,
+    searchQuery,
+  } = useAppData();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
@@ -46,14 +55,14 @@ export default function DashboardPage() {
     name: string;
     description: string;
   }) => {
-    if (!editing) return;
-    const updated = await api.updateProject(editing.id, values);
+    if (!editing || !nickname) return;
+    const updated = await api.updateProject(editing.id, values, nickname);
     upsertProject(updated);
   };
 
   const confirmDelete = async () => {
-    if (!deleting) return;
-    await api.deleteProject(deleting.id);
+    if (!deleting || !nickname) return;
+    await api.deleteProject(deleting.id, nickname);
     removeProject(deleting.id);
     setDeleting(null);
   };
@@ -82,9 +91,15 @@ export default function DashboardPage() {
             왼쪽 &quot;새 프로젝트&quot; 버튼으로 시작해 보세요.
           </p>
         </Card>
+      ) : filteredProjects.length === 0 ? (
+        <Card className="items-center gap-1 p-10 text-center">
+          <p className="text-sm text-muted-foreground">
+            &quot;{searchQuery}&quot;와 일치하는 프로젝트가 없습니다.
+          </p>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-          {projects.map((project) => (
+          {filteredProjects.map((project) => (
             <Card
               key={project.id}
               className="cursor-pointer transition-colors hover:border-primary"

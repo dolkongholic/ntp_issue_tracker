@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -18,12 +17,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ProjectDialog } from "@/components/project-dialog";
+import { NoteGuideDialog } from "@/components/note-guide-dialog";
+import { NoteWriteDialog } from "@/components/note-write-dialog";
 import { api, ApiError } from "@/lib/api";
 import { useNickname } from "@/lib/use-nickname";
 import { useAppData } from "@/lib/app-data";
 import { NICKNAME_THEME } from "@/lib/nickname-theme";
 import { dateGroupLabel, dateKey, formatTime } from "@/lib/format";
-import { NOTE_TAGS, type Note, type NoteTag, type Project } from "@/lib/types";
+import type { Note, NoteTag, Project } from "@/lib/types";
 
 export default function ProjectDetailPage() {
   const params = useParams<{ projectId: string }>();
@@ -38,12 +39,15 @@ export default function ProjectDetailPage() {
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [content, setContent] = useState("");
-  const [tag, setTag] = useState<NoteTag | null>(null);
-  const [saving, setSaving] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [deletingNote, setDeletingNote] = useState<Note | null>(null);
+  const [deletingNoteBusy, setDeletingNoteBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -76,29 +80,53 @@ export default function ProjectDetailPage() {
     return notes.filter((n) => dateKey(n.createdAt) === today).length;
   }, [notes]);
 
-  const handleSaveNote = async () => {
-    if (!nickname || !content.trim() || !project) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const note = await api.createNote(projectId, content.trim(), nickname, tag);
-      setContent("");
-      setTag(null);
+  const openCreateNote = () => {
+    setEditingNote(null);
+    setNoteDialogOpen(true);
+  };
+
+  const openEditNote = (note: Note) => {
+    setEditingNote(note);
+    setNoteDialogOpen(true);
+  };
+
+  const handleSubmitNote = async (content: string, tag: NoteTag | null) => {
+    if (!nickname || !project) return;
+    if (editingNote) {
+      const updated = await api.updateNote(
+        projectId,
+        editingNote.id,
+        { content, tag },
+        nickname
+      );
+      setNotes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)));
+    } else {
+      const note = await api.createNote(projectId, content, nickname, tag);
       setNotes((prev) => [note, ...prev]);
       upsertProject({ ...project, updatedAt: note.createdAt });
       bumpActivity(nickname, note.createdAt);
+    }
+  };
+
+  const confirmDeleteNote = async () => {
+    if (!deletingNote || !nickname) return;
+    setDeletingNoteBusy(true);
+    try {
+      await api.deleteNote(projectId, deletingNote.id, nickname);
+      setNotes((prev) => prev.filter((n) => n.id !== deletingNote.id));
+      setDeletingNote(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "저장에 실패했습니다.");
+      setError(err instanceof Error ? err.message : "삭제에 실패했습니다.");
     } finally {
-      setSaving(false);
+      setDeletingNoteBusy(false);
     }
   };
 
   const confirmDelete = async () => {
-    if (!project) return;
+    if (!project || !nickname) return;
     setDeleting(true);
     try {
-      await api.deleteProject(project.id);
+      await api.deleteProject(project.id, nickname);
       removeProject(project.id);
       router.push("/dashboard");
     } catch (err) {
@@ -127,31 +155,39 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">
-            {project.name}
-          </h1>
-          {project.description && (
-            <p className="mt-1 text-sm text-muted-foreground">
-              {project.description}
-            </p>
-          )}
-        </div>
-        <div className="flex shrink-0 gap-2">
-          <Button variant="outline" size="sm" onClick={() => router.push("/dashboard")}>
+      <div className="flex justify-end">
+        <div
+          data-slot="button-group"
+          className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-muted/30 p-1"
+        >
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push("/dashboard")}
+          >
             <ArrowLeft />
-            대시보드
+            대시보드로 이동
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+          <Button variant="ghost" size="sm" onClick={() => setEditOpen(true)}>
             <Pencil />
-            수정
+            프로젝트 수정
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setDeleteOpen(true)}>
+          <Button variant="ghost" size="sm" onClick={() => setDeleteOpen(true)}>
             <Trash2 />
-            삭제
+            프로젝트 삭제
           </Button>
         </div>
+      </div>
+
+      <div className="text-center">
+        <h1 className="text-3xl font-semibold tracking-tight">
+          {project.name}
+        </h1>
+        {project.description && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            {project.description}
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:max-w-xs">
@@ -165,41 +201,18 @@ export default function ProjectDetailPage() {
         </Card>
       </div>
 
-      <Card className="gap-3 p-4">
-        <p className="text-sm font-medium">오늘 무엇을 했나요?</p>
-        <Textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder={`${nickname ?? ""}(으)로 기록을 남깁니다...`}
-          rows={4}
-        />
-        <div className="flex flex-wrap gap-1.5">
-          {NOTE_TAGS.map((t) => (
-            <Button
-              key={t}
-              type="button"
-              variant={tag === t ? "default" : "outline"}
-              size="xs"
-              onClick={() => setTag((prev) => (prev === t ? null : t))}
-            >
-              {t}
-            </Button>
-          ))}
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">
-            {nickname}(으)로 저장됩니다.
-          </span>
-          <Button onClick={handleSaveNote} disabled={saving || !content.trim()}>
-            {saving ? "저장 중..." : "저장"}
-          </Button>
-        </div>
-      </Card>
-
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       <div className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-muted-foreground">타임라인</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-medium text-muted-foreground">
+            타임라인
+          </h2>
+          <Button type="button" size="sm" onClick={openCreateNote}>
+            <Plus />
+            작성하기
+          </Button>
+        </div>
 
         {notes.length === 0 ? (
           <p className="text-sm text-muted-foreground">
@@ -213,6 +226,7 @@ export default function ProjectDetailPage() {
             />
             {notes.map((note, idx) => {
               const theme = NICKNAME_THEME[note.author];
+              const isMine = note.author === nickname;
               const showDateHeader =
                 idx === 0 ||
                 dateKey(note.createdAt) !== dateKey(notes[idx - 1].createdAt);
@@ -233,9 +247,33 @@ export default function ProjectDetailPage() {
                       <span className={`text-sm font-medium ${theme.text}`}>
                         {note.author}
                       </span>
-                      <span className="text-xs text-muted-foreground">
-                        {formatTime(note.createdAt)}
-                      </span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs text-muted-foreground">
+                          {formatTime(note.createdAt)}
+                        </span>
+                        {isMine && (
+                          <>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-xs"
+                              onClick={() => openEditNote(note)}
+                            >
+                              <Pencil />
+                              <span className="sr-only">기록 수정</span>
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-xs"
+                              onClick={() => setDeletingNote(note)}
+                            >
+                              <Trash2 />
+                              <span className="sr-only">기록 삭제</span>
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </div>
                     {note.tag && (
                       <Badge variant="secondary" className="mt-1.5">
@@ -253,12 +291,50 @@ export default function ProjectDetailPage() {
         )}
       </div>
 
+      <NoteGuideDialog open={guideOpen} onOpenChange={setGuideOpen} />
+
+      {nickname && (
+        <NoteWriteDialog
+          open={noteDialogOpen}
+          onOpenChange={setNoteDialogOpen}
+          nickname={nickname}
+          note={editingNote}
+          onSubmit={handleSubmitNote}
+          onOpenGuide={() => setGuideOpen(true)}
+        />
+      )}
+
+      <AlertDialog
+        open={!!deletingNote}
+        onOpenChange={(open) => !open && setDeletingNote(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>기록을 삭제할까요?</AlertDialogTitle>
+            <AlertDialogDescription>
+              이 기록은 되돌릴 수 없이 삭제됩니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-white hover:bg-destructive/90"
+              disabled={deletingNoteBusy}
+              onClick={confirmDeleteNote}
+            >
+              {deletingNoteBusy ? "삭제 중..." : "삭제"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <ProjectDialog
         open={editOpen}
         onOpenChange={setEditOpen}
         project={project}
         onSubmit={async (values) => {
-          const updated = await api.updateProject(project.id, values);
+          if (!nickname) return;
+          const updated = await api.updateProject(project.id, values, nickname);
           setProject(updated);
           upsertProject(updated);
         }}

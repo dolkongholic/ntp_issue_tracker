@@ -36,20 +36,21 @@ export const api = {
 
   updateProject: (
     id: string,
-    patch: { name?: string; description?: string }
+    patch: { name?: string; description?: string },
+    actor: Nickname
   ) =>
     fetch(`/api/projects/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
+      body: JSON.stringify({ ...patch, actor }),
     })
       .then((r) => handle<{ project: Project }>(r))
       .then((d) => d.project),
 
-  deleteProject: (id: string) =>
-    fetch(`/api/projects/${id}`, { method: "DELETE" }).then((r) =>
-      handle<{ ok: true }>(r)
-    ),
+  deleteProject: (id: string, actor: Nickname) =>
+    fetch(`/api/projects/${id}?actor=${encodeURIComponent(actor)}`, {
+      method: "DELETE",
+    }).then((r) => handle<{ ok: true }>(r)),
 
   getProject: (id: string) =>
     fetch(`/api/projects/${id}`, { cache: "no-store" })
@@ -74,6 +75,26 @@ export const api = {
     })
       .then((r) => handle<{ note: Note }>(r))
       .then((d) => d.note),
+
+  updateNote: (
+    projectId: string,
+    noteId: string,
+    patch: { content?: string; tag?: NoteTag | null },
+    actor: Nickname
+  ) =>
+    fetch(`/api/projects/${projectId}/notes/${noteId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...patch, actor }),
+    })
+      .then((r) => handle<{ note: Note }>(r))
+      .then((d) => d.note),
+
+  deleteNote: (projectId: string, noteId: string, actor: Nickname) =>
+    fetch(
+      `/api/projects/${projectId}/notes/${noteId}?actor=${encodeURIComponent(actor)}`,
+      { method: "DELETE" }
+    ).then((r) => handle<{ ok: true }>(r)),
 
   getActivity: () =>
     fetch("/api/activity", { cache: "no-store" })

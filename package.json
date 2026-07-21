@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "nodemon",
-    "dev:next": "next dev",
+    "dev:next": "next dev -p 5001",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 5001",
     "lint": "eslint"
   },
   "dependencies": {

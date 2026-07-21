@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "프로젝트 트래커",
+  title: "Issue Tracker",
   description: "팀 프로젝트 기록 공유 트래커",
 };
 
@@ -27,6 +27,14 @@ export default function RootLayout({
       lang="ko"
       className={`dark ${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <link
+          rel="stylesheet"
+          as="style"
+          crossOrigin=""
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css"
+        />
+      </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         {children}
       </body>

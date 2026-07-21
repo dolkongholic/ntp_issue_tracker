@@ -45,7 +45,7 @@ export function AppSidebar() {
           className="w-full justify-start px-2 text-base font-semibold tracking-tight"
           render={<Link href="/dashboard" />}
         >
-          프로젝트 트래커
+          Issue Tracker
         </Button>
       </div>
 

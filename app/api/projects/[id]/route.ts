@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { mutateDb, withDb } from "@/lib/db";
+import { logAccess, logAction, logWarn } from "@/lib/logger";
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
   const { id } = await params;
+  logAccess("GET", `/api/projects/${id}`);
   const project = await withDb((db) =>
     db.projects.find((p) => p.id === id)
   );
   if (!project) {
+    logWarn("GET", `/api/projects/${id}`, { reason: "not found" });
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
   return NextResponse.json({ project });
@@ -20,8 +23,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const name = typeof body?.name === "string" ? body.name.trim() : undefined;
   const description =
     typeof body?.description === "string" ? body.description.trim() : undefined;
+  const actor = typeof body?.actor === "string" ? body.actor : null;
 
   if (name === "") {
+    logWarn("PATCH", `/api/projects/${id}`, { reason: "empty name", actor });
     return NextResponse.json({ error: "name cannot be empty" }, { status: 400 });
   }
 
@@ -35,13 +40,23 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   });
 
   if (!project) {
+    logWarn("PATCH", `/api/projects/${id}`, { reason: "not found", actor });
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
+
+  logAction("PATCH", `/api/projects/${id}`, actor, "update-project", {
+    projectId: id,
+    name,
+    descriptionChanged: description !== undefined,
+  });
+
   return NextResponse.json({ project });
 }
 
-export async function DELETE(_req: NextRequest, { params }: Params) {
+export async function DELETE(req: NextRequest, { params }: Params) {
   const { id } = await params;
+  const actor = req.nextUrl.searchParams.get("actor");
+
   const deleted = await mutateDb((db) => {
     const idx = db.projects.findIndex((p) => p.id === id);
     if (idx === -1) return false;
@@ -51,7 +66,13 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   });
 
   if (!deleted) {
+    logWarn("DELETE", `/api/projects/${id}`, { reason: "not found", actor });
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
+
+  logAction("DELETE", `/api/projects/${id}`, actor, "delete-project", {
+    projectId: id,
+  });
+
   return NextResponse.json({ ok: true });
 }

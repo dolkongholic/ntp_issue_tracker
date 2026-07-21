@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from "react";
 import { api } from "@/lib/api";
@@ -14,11 +15,15 @@ type ActivityMap = Record<Nickname, string | null>;
 
 type AppDataContextValue = {
   projects: Project[];
+  filteredProjects: Project[];
   projectsLoading: boolean;
   projectsError: string | null;
   reloadProjects: () => Promise<void>;
   upsertProject: (project: Project) => void;
   removeProject: (id: string) => void;
+
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
 
   activity: ActivityMap;
   reloadActivity: () => Promise<void>;
@@ -34,6 +39,7 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [projectsError, setProjectsError] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityMap>(EMPTY_ACTIVITY);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const reloadProjects = useCallback(async () => {
     setProjectsLoading(true);
@@ -80,15 +86,28 @@ export function AppDataProvider({ children }: { children: React.ReactNode }) {
     setActivity((prev) => ({ ...prev, [author]: at }));
   }, []);
 
+  const filteredProjects = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return projects;
+    return projects.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.description.toLowerCase().includes(q)
+    );
+  }, [projects, searchQuery]);
+
   return (
     <AppDataContext.Provider
       value={{
         projects,
+        filteredProjects,
         projectsLoading,
         projectsError,
         reloadProjects,
         upsertProject,
         removeProject,
+        searchQuery,
+        setSearchQuery,
         activity,
         reloadActivity,
         bumpActivity,

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
+import { Header } from "@/components/header";
 import { AppDataProvider } from "@/lib/app-data";
 import { useNickname } from "@/lib/use-nickname";
 
@@ -30,7 +31,8 @@ export default function DashboardLayout({
     <AppDataProvider>
       <div className="flex h-screen w-full overflow-hidden">
         <AppSidebar />
-        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
+          <Header />
           <div className="w-full px-8 py-8 lg:px-12 lg:py-10">{children}</div>
         </main>
       </div>
