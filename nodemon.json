@@ -1,0 +1,6 @@
+{
+  "watch": ["app", "lib", "data"],
+  "ext": "ts,tsx,js,jsx,json",
+  "ignore": [".next/**", "node_modules/**", "data/db.json"],
+  "exec": "next dev"
+}
